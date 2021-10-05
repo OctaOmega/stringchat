@@ -6,7 +6,7 @@ In this initial version, the client could send messages to the server and the se
 
 Working on the next version, which will include the options:
 
-. The server to respond in string format.
-. Client could push files to the server.
+i) The server to respond in string format.
+ii) Client could push files to the server.
 
 Binary files are available in \Debug folder.
