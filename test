@@ -1,0 +1,33 @@
+To strengthen process integrity and prevent avoidable incidents, teams must be aware of frequent errors observed during certificate revoke operations.
+
+Typical Mistakes:
+
+Revoking an Active Certificate
+
+Revocation performed while the certificate is still bound to live services, causing downtime or SSL handshake failures.
+Preventive Measure: Always validate via F5 and server inventory before execution.
+
+Dependencies Still Using the Revoked Version
+
+F5 or backend systems continue to reference the old certificate after revocation.
+Preventive Measure: Confirm propagation and update configuration on all connected systems.
+
+Incomplete Decommission Planning
+
+Services marked for decommission without proper decom request or asset cleanup.
+Preventive Measure: Ensure formal decommission approval is in place before certificate removal.
+
+Lack of Proper Communication
+
+Teams proceed with revocation without notifying stakeholders or application owners.
+Preventive Measure: Notify all impacted owners, confirm readiness, and document confirmation before action.
+
+Missing Change Record for PROD/PAT
+
+Revocations performed without CR linkage or approvals, leading to audit gaps.
+Preventive Measure: Mandate CR creation and approval for any PAT/PROD environment activity.
+
+Assuming Replacement Deployment is Successful Without Validation
+
+New certificate is pushed but not validated, leading to failure post-revocation.
+Preventive Measure: Always verify certificate health post-deployment (F5 pool status, browser test, SSL checker).
