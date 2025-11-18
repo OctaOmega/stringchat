@@ -1,0 +1,99 @@
+"""
+send_html_email_via_outlook.py
+
+Requirements:
+    pip install pywin32
+
+This script:
+- Uses the currently logged-in Outlook profile (SSO / existing session)
+- Sends an HTML email
+"""
+
+import win32com.client as win32
+
+
+def send_html_email(
+    to_recipients,
+    subject,
+    html_body,
+    cc_recipients=None,
+    bcc_recipients=None,
+    attachments=None,
+    display_before_send=False,
+):
+    """
+    Send an HTML email using the default Outlook profile.
+
+    :param to_recipients: str or list of str - main recipients
+    :param subject: str - email subject
+    :param html_body: str - HTML content of the email
+    :param cc_recipients: str or list of str - CC recipients
+    :param bcc_recipients: str or list of str - BCC recipients
+    :param attachments: list of file paths to attach
+    :param display_before_send: if True, opens the email window instead of sending immediately
+    """
+
+    # Normalize recipients to semicolon-separated strings (Outlook format)
+    def normalize_recipients(value):
+        if not value:
+            return ""
+        if isinstance(value, str):
+            return value
+        return "; ".join(value)
+
+    to_str = normalize_recipients(to_recipients)
+    cc_str = normalize_recipients(cc_recipients)
+    bcc_str = normalize_recipients(bcc_recipients)
+
+    # Get Outlook application
+    outlook = win32.Dispatch("Outlook.Application")
+    mail = outlook.CreateItem(0)  # 0 = MailItem
+
+    mail.To = to_str
+    mail.CC = cc_str
+    mail.BCC = bcc_str
+    mail.Subject = subject
+
+    # Set HTML body
+    mail.HTMLBody = html_body
+
+    # Add attachments if any
+    if attachments:
+        for filepath in attachments:
+            mail.Attachments.Add(Source=filepath)
+
+    # Either display or send directly
+    if display_before_send:
+        mail.Display()  # opens Outlook window with the message
+    else:
+        mail.Send()     # sends immediately using current Outlook account
+
+
+if __name__ == "__main__":
+    # Example usage
+    to = ["someone@example.com"]
+    subject = "Test HTML Email from Python via Outlook"
+    html = """
+    <html>
+      <body>
+        <h2 style="color:#2d6cdf;">Hello from Python 👋</h2>
+        <p>This email was sent using your <b>Outlook</b> profile and SSO session.</p>
+        <p>Here is a small <span style="color:green;">HTML</span> example:</p>
+        <ul>
+          <li>Bold text</li>
+          <li>Colored text</li>
+          <li>Lists and more</li>
+        </ul>
+      </body>
+    </html>
+    """
+
+    send_html_email(
+        to_recipients=to,
+        subject=subject,
+        html_body=html,
+        cc_recipients=None,
+        bcc_recipients=None,
+        attachments=None,
+        display_before_send=False,  # change to True if you want to preview
+    )
