@@ -1,0 +1,135 @@
+What’s really going on
+
+From the issues you linked:
+
+Python 3.13’s ssl.create_default_context() now enables VERIFY_X509_STRICT by default. 
+bugzilla.redhat.com
++1
+
+That causes OpenSSL to enforce RFC 5280 much more strictly: certificates must have proper Authority Key Identifier (AKI) / Subject Key Identifier (SKI) relationships, etc.
+
+Many internal / corporate CAs and proxies issue certs that are “good enough” for normal verification but missing AKI or otherwise not fully RFC-compliant. Those now fail with:
+
+SSLCertVerificationError: ... certificate verify failed: Missing Authority Key Identifier (_ssl.c:1032) 
+GitHub
++1
+
+The OpenSSL issue you linked is therefore marked “resolved: not a bug” – OpenSSL is just doing what it’s told in strict mode. 
+GitHub
+
+So to “fix” it, you either:
+
+Fix your certificates (recommended), or
+
+Turn off strict verification in your client (workaround / less secure).
+
+1. Proper fix: fix your CA / proxy certificates
+
+You need to make your internal CA + any intermediates RFC 5280-compliant:
+
+Inspect the chain your client sees
+
+openssl s_client -connect your-proxy:443 -showcerts </dev/null
+
+
+Save each cert to a file (cert0.pem, cert1.pem, …) and inspect:
+
+openssl x509 -in cert0.pem -noout -text | sed -n '60,120p'
+
+
+Check for:
+
+X509v3 Subject Key Identifier
+
+X509v3 Authority Key Identifier
+
+For every non-self-signed CA or intermediate in the chain:
+
+It must have an Authority Key Identifier that points to the issuer (usually matches the issuer’s Subject Key Identifier, or contains the issuer DN + serial).
+
+If it’s missing, that’s what triggers Missing Authority Key Identifier.
+
+Update your CA / proxy config (OpenSSL example) to include:
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, keyCertSign, cRLSign
+
+
+Then re-issue the CA/intermediate certs and any leaf certs as needed, redeploy them on your proxy / internal PKI.
+
+This is exactly how other projects fixed it when they hit the same error – they added proper SKI/AKI extensions to their generated certs. 
+Launchpad
++1
+
+Once the chain is RFC-compliant, VERIFY_X509_STRICT will pass without any client-side hacks.
+
+2. Workaround: disable VERIFY_X509_STRICT in your Python client
+
+If you can’t fix the certs immediately and just need things working while infra catches up, you can turn off strict verification in your client code.
+
+a) Using urllib.request
+
+From a Python core dev suggestion: 
+Discussions on Python.org
+
+import ssl
+import urllib.request
+
+ctx = ssl.create_default_context()
+ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT   # remove strict flag
+
+with urllib.request.urlopen("https://www.google.com", context=ctx) as r:
+    print(r.status, r.read()[:100])
+
+b) Using requests (via a custom adapter)
+import ssl
+import requests
+from urllib3.util import ssl_ as urllib3_ssl
+from requests.adapters import HTTPAdapter
+
+class NonStrictHTTPSAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = urllib3_ssl.create_urllib3_context()
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+        kwargs["ssl_context"] = ctx
+        return super().init_poolmanager(*args, **kwargs)
+
+session = requests.Session()
+session.mount("https://", NonStrictHTTPSAdapter())
+
+r = session.get(
+    "https://www.google.com",
+    verify="/etc/ssl/certs/ca-certificates.crt",  # your CA bundle
+    # proxies=... if needed
+)
+print(r.status_code, r.text[:100])
+
+
+This keeps normal certificate verification, but removes the strict RFC 5280 checks that are choking on your broken AKI.
+
+⚠️ Security note: Disabling VERIFY_X509_STRICT is safer than completely disabling verification, but still weakens checks. It should be treated as a temporary workaround until your PKI is fixed.
+
+3. Quick escape hatches (not ideal)
+
+If you just need a “it must work right now” hack for some internal tooling:
+
+Run it with Python 3.12 instead of 3.13 (no strict flag by default). 
+GitHub
++1
+
+Or completely disable verification (verify=False in requests, PYTHONHTTPSVERIFY=0, etc.) – but this is insecure and usually a bad idea except in a lab.
+
+TL;DR
+
+OpenSSL issue 28391 is closed as “not a bug” because Python 3.13’s strict mode is correctly rejecting a malformed certificate chain. 
+GitHub
++1
+
+Real fix: regenerate your internal CA / proxy certs so every CA / intermediate has proper SKI/AKI per RFC 5280.
+
+Workaround: in Python, create a custom SSLContext and do:
+
+ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
