@@ -1,33 +1,19 @@
-# /etc/systemd/system/flaskapp.service
-# Runs a Flask app via gunicorn on 127.0.0.1:5000
-
-[Unit]
-Description=Flask App (Gunicorn)
-After=network.target
-
-[Service]
-Type=simple
-User=flaskapp
-Group=flaskapp
-
-WorkingDirectory=/opt/myapp
-Environment="PATH=/opt/myapp/venv/bin"
-Environment="FLASK_ENV=production"
-# Optional app config:
-# Environment="SECRET_KEY=change-me"
-# Environment="DATABASE_URL=..."
-
-# For a factory app, use "wsgi:app" where wsgi.py exposes app = create_app()
-ExecStart=/opt/myapp/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --access-logfile - --error-logfile - wsgi:app
-
-Restart=always
-RestartSec=3
-
-# Hardening (safe defaults; adjust if your app needs more)
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-
-[Install]
-WantedBy=multi-user.target
+            {% elif module.type == 'link' %}
+            <div class="d-flex flex-column h-100">
+                <div class="alert alert-info d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="fas fa-info-circle me-2"></i>
+                        If the content below does not load, please open it in a new tab.
+                    </span>
+                    <a href="{{ module.content_url }}" target="_blank" class="btn btn-sm btn-primary">
+                        <i class="fas fa-external-link-alt me-1"></i> Open in New Tab
+                    </a>
+                </div>
+                <div class="flex-grow-1 border rounded" style="min-height: 600px;">
+                    <iframe src="{{ module.content_url }}" width="100%" height="100%" style="border: none;"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
+                        <p>Your browser does not support iframes.</p>
+                    </iframe>
+                </div>
+            </div>
+            {% endif %}
